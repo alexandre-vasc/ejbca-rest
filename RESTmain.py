@@ -54,7 +54,7 @@ def getCAChain(cacn):
         cert = zeep.helpers.serialize_object( ejbcaServ().getLastCAChain(cacn))
     except zeep.exceptions.Fault as error:
         return formatResponse(400, 'soap message: ' + error.message)
-    
+
     return make_response(json.dumps({'certificate': cert[0]['certificateData']}), 200)
 
 #receive the cert status
@@ -64,7 +64,7 @@ def verifyCert(cacn,certsn):
         cert = zeep.helpers.serialize_object( ejbcaServ().checkRevokationStatus(cacn, certsn))
     except zeep.exceptions.Fault as error:
         return formatResponse(400, 'soap message: ' + error.message)
-    
+
     resp = {
         'reason': enumList.REVOKATION_REASON( cert['reason'] ).name,
         'date': cert['revocationDate'].isoformat()
@@ -92,12 +92,12 @@ def revokeCert(cacn,certsn):
                 reasonCode = enumList.REVOKATION_REASON[request.args['reason']].value
             except KeyError:
                 return formatResponse(400, 'invalid revokation reason ' + request.args['reason'])
-    
+
     try:
         resp = zeep.helpers.serialize_object( ejbcaServ().revokeCert(cacn, certsn, reasonCode))
     except zeep.exceptions.Fault as error:
         return formatResponse(400, 'soap message: ' + error.message)
-        
+
     return formatResponse(200)
 
 #create or update CRL
@@ -161,7 +161,7 @@ def deleteUser(username):
     #default values
     deleteAfter = False
     reasonCode = enumList.REVOKATION_REASON['UNSPECIFIED'].value
-    
+
     #URL param
     if len(request.args) > 0:
         if 'reason' in request.args:
@@ -183,15 +183,15 @@ def findCerts(username):
     onlyValid = True
     if len(request.args) > 0:
         if 'valid' in request.args:
-            onlyValid = request.args['valid'] in ['True', 'true']            
-    
+            onlyValid = request.args['valid'] in ['True', 'true']
+
     try:
         certs = zeep.helpers.serialize_object( ejbcaServ().findCerts(username, onlyValid))
     except zeep.exceptions.Fault as error:
         return formatResponse(400, 'soap message: ' + error.message)
     if len(certs) == 0:
         return formatResponse(404, 'no certificates found')
-    
+
     return make_response(json.dumps({'certs': certs}), 200)
 
 # json parameters: 'passwd': the user password.
@@ -200,9 +200,9 @@ def findCerts(username):
 def pkcs10Request(username):
     if request.mimetype != 'application/json':
         return formatResponse(400, 'invalid mimetype')
-    
+
     try:
-        info = json.loads(request.data)        
+        info = json.loads(request.data)
         if not info.keys() <= ['passwd', 'certificate']:
             return formatResponse(400, 'Missing parameter. Expected: passwd and certificate')
     except ValueError:
@@ -212,18 +212,19 @@ def pkcs10Request(username):
         resp = zeep.helpers.serialize_object( ejbcaServ().pkcs10Request(username,info['passwd'],info['certificate'],None,"CERTIFICATE") )
     except zeep.exceptions.Fault as error:
         return formatResponse(400, 'soap message: ' + error.message)
-    
+
     return make_response(json.dumps({'status': resp}), 200)
 
 if __name__ == '__main__':
     while True:
         try:
-            initicalConf() #execute the EJBCA handshake and load SOAP API metadata 
+            initicalConf() #execute the EJBCA handshake and load SOAP API metadata
             break
-        except requests.exceptions.ConnectionError:
-            print "Cant connect to EJBCA server for initial configuration"
-            print "Chances are the server is not ready yet. Will retry in 30sec"
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.HTTPError):
+            print("Cant connect to EJBCA server for initial configuration")
+            print("Chances are the server is not ready yet.")
+            print("Will retry in 30sec")
             sleep(30)
-                    
+
     app.run(host='0.0.0.0', port=5583, threaded=True)
-    
